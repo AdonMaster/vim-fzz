@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
-	"time"
+	"path/filepath"
 )
-
 
 // structs
 type SearchRequest struct {
@@ -53,36 +51,25 @@ func dispatcher(reqCh chan SearchRequest) {
 
 func searchWorker(req SearchRequest) {
 
-    items := []string{
-        "apple", "apricot", "banana", "blackberry", "blueberry",
-        "cherry", "date", "fig", "grape", "kiwi",
-        "lemon", "lime", "mango", "melon", "orange",
-        "papaya", "peach", "pear", "pineapple", "plum",
-    }
+	//
+	err := filepath.Walk("./", func(path string, info os.FileInfo, err error) error {
+		
+		//
+		if err != nil {
+			return err
+		}
+	
+		//
+		println(path)
 
-    //
-    fmt.Println("--init")
+		//
+		return nil
 
-    //
-    count := 0
-    for _, item := range items {
-        select {
+	})
 
-        case <-req.Done:
-            return
-
-        default:
-            if strings.Contains(item, req.Query) {
-                // delay
-                time.Sleep(300 * time.Millisecond)
-                fmt.Println(item)
-                count++
-                if count >= MAX_RESULTS {
-                    return
-                }
-
-            }
-        }
-    }
+	if err != nil {
+		fmt.Printf("%q: %v", "./", err)
+		return
+	}
 
 }
