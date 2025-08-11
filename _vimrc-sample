@@ -1,0 +1,121 @@
+" Mine
+set nocompatible
+set encoding=utf-8
+
+set ignorecase
+set smartcase
+
+set nowrap
+set hidden
+inoremap jk <Esc>
+
+set nu
+set rnu
+
+let mapleader = " "
+let g:mapleader = " "
+
+set tabstop=4
+set shiftwidth=4
+set expandtab
+
+set cursorline
+set title
+set incsearch
+set hlsearch
+nnoremap <Leader>/ :noh<CR>
+
+set nobackup
+set nowritebackup
+set noswapfile
+set autoread
+set autowrite
+set undofile
+set undodir=~/.cache/vim/undo
+
+set foldtext=syntax
+
+
+" *********************************** SDASCHNER MAPS ***********************************
+" move lines with Ctrl + (Shift) +J/K
+nnoremap <C-j> :m +1<CR>
+nnoremap <C-k> :m -2<CR>
+inoremap <C-j> <Esc>:m +1<CR>gi
+inoremap <C-k> <Esc>:m -2<CR>gi
+vnoremap <C-j> :m '>+1<CR>gvgv
+vnoremap <C-k> :m '<-2<CR>gvgv
+" *********************************** SDASCHNER MAPS ***********************************
+
+
+" Terminal and window size mapping
+nnoremap <F12> :vert rightbelow terminal ++close cmd<CR><C-w>L<C-w>:vert resize 60<CR>
+nnoremap <F11> :vert resize +5<CR>
+nnoremap <F10> :vert resize -5<CR>
+nnoremap <F9> :resize +5<CR>
+nnoremap <F8> :resize -5<CR>
+
+
+" Plugin directory
+call plug#begin('~/.vim/plugged')
+
+
+  " Plugin list
+  Plug 'bling/vim-bufferline'
+  Plug 'easymotion/vim-easymotion'
+  Plug 'morhetz/gruvbox'
+  Plug 'vim-airline/vim-airline'
+
+  Plug 'mbbill/undotree'
+  Plug 'tpope/vim-surround'
+  Plug 'tpope/vim-repeat'
+  Plug 'wellle/context.vim'
+  Plug 'preservim/tagbar' ":TagbarToggle
+  
+  " lsp and autocompletion
+  Plug 'prabirshrestha/vim-lsp'
+  Plug 'mattn/vim-lsp-settings'
+  Plug 'prabirshrestha/asyncomplete.vim'
+  Plug 'prabirshrestha/asyncomplete-lsp.vim'
+
+  " fzf
+  Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+  Plug 'junegunn/fzf.vim'
+  
+" Plugin system
+call plug#end()
+
+
+" Grovebox config
+colorscheme gruvbox
+set background=dark
+
+
+" nerdTree config
+map <C-n> :NERDTreeToggle<CR>
+nnoremap HH :bp<CR>
+nnoremap LL :bn<CR>
+
+" ctrlP config
+let g:ctrlp_custom_ignore = '\v[\/](node_modules|git|sass|public|tmp|bower_components)$'
+
+" bufferline config
+let g:airline#extensions#tabline#enabled = 1
+
+" easymotion config
+map <Leader><Leader>w <Plug>(easymotion-bd-w)
+
+" lsp config
+"...
+
+" undoTree config
+nnoremap <Leader>u :UndotreeToggle<CR>
+
+
+
+
+
+
+" My fzz plugin
+source D:/Projects/vim-fzz/fzz.vim
+nnoremap <Leader>ff :Fzz<CR>
+nnoremap <Leader>ss :w<Bar>source %<CR>
