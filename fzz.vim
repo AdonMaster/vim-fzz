@@ -44,20 +44,24 @@ function! Fzz()
 
 
     "// Initialization
-    let s:data = ['monstroso', 'gabriel', 'relogio do cuco']
+    let s:data = [
+        \ 'this is something',
+        \ 'something green tea!!',
+    \ ]
     let s:q = ''
        
 
     "//
     let s:instance = popup_create(s:data, {
-                \ 'title': ' Fzz - Adon ',
-                \ 'pos': 'center',
-                \ 'border': [],
-                \ 'padding': [],
-                \ 'minwidth': 30, 
-                \ 'mapping': 0,
-                \ 'filter': funcref('s:Filter')
-                \ })
+        \ 'title': ' Fzz - Adon ',
+        \ 'pos': 'center',
+        \ 'border': [],
+        \ 'padding': [],
+        \ 'minwidth': 30, 
+        \ 'mapping': 0,
+        \ 'filter': funcref('s:Filter'),
+        \ 'highlight': 'Normal',
+    \ })
 
 endfunction
 
@@ -119,6 +123,7 @@ function! s:ServerSend()
     echo l:result
 endfunction
 
+
 " //
 function! s:Refresh()
 
@@ -132,7 +137,7 @@ function! s:Refresh()
 endfunction
 
 
-"
+" //
 function! s:Close()
     if s:instance != -1
         call popup_close(s:instance)
