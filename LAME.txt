@@ -1,0 +1,207 @@
+gg = first line
+G = last line
+gG = go to the end of file
+
+gu = makes text lower case.. ex.: guw = alter the current word
+guu = makes the line lowercase
+gU = upper case
+g~ = toggle case of each word... ex.: g~w
+
+ge = moves to the end of prior word
+
+== smart ident
+o = new line below AND INSERT MODE
+fa = find the next a
+; = next find
+, = prior find
+
+0 = start of line
+$ = end of line
+
+shift + M = center of the page
+zz = make ur current cursor be the center of the page
+
+d [something] = puts in delete mode, you can type w, W, 0, $, f...
+dd = deletes line
+
+c [something] = puts in change mode
+
+
+y [something] = puts in yank mode, you can type....
+yy = yank line
+
+p = paste after caret
+P = paste before caret
+
+r = replace a single character.. but 5r0 = 00000
+shift + R = puts in replace mode
+
+s = replace a single character, AND puts you in insert mode
+S = removes the line, AND puts you in insert mode
+
+
+
+u = undo
+ctrl + R = redo
+
+
+% = navigate between close scopes
+
+diw = delete in word
+dip = delete in paragraph
+di{ = delete in {
+di( = delete in (
+^ this works with yank too.. and maybe others
+
+
+daw = delete around the word (it gobbles spaces with the word)
+ex.: "(ab )" => di( => "()"
+ex.: "(ab )" => da( => ""
+
+
+o = new line
+
+
+:set nu = shows the absolute for current line
+:set rnu = shows the relative number for all lines
+:set nornu = shows the absolute for all lines (default)
+
+
+/pomba = search "pomba", n = next, N = prior
+? = search but inverted order on n and N
+
+
+H = HIGH moves to top of visible screen
+L = LOW moves to bottom of visible screen
+M = MIDDLE of visible screen
+
+J = joins the current line with below it (strip spaces)
+gJ = joins the current line with below it (just join)
+
+
+ZZ = :wq
+ZQ = :q!
+
+^ = start of non-blank line
+
+
+================
+a = append, A = append end of line
+i = insert, I = insert start of line
+
+
+====
+
+vib = ()
+viB = {}
+vi[ = []
+
+==
+cursor back on prior position: ''
+
+== MULTIPLE CURSOR
+ctrl + v, select a vertical range..
+CAPITAL I = edit some text
+escapes...
+TA DAHH
+
+=== last highlighted selection
+gv
+
+=== MULTIPLE CURSOR + end of line edit (only works to add text)
+ctrl + v, select a vertical range
+I = prepend text
+[esc]
+gv = restore selection
+$ = end of line
+A = append to lingee & write text
+[esc]
+
+== SUBSTITUTE
+- select a range
+:'<,'>s/"/'/g (substitute " for ' globally)
+-- If you wanna the whole file
+:%s/a/b/g (substitute a for b globally)
+-- confirm mode
+:%s/a/b/gc (substitute a for b globally ON CONFIRMATION)
+-- single line 
+:s/.....
+
+== MACRO
+qa = start recording a macro into [a] register
+q = stop macro
+@a = play macro
+@@ = play last macro
+
+
+== more navigation + -
++ start of next line, non-blank
+- start of previous line, non-blank
+
+== yank + clipboard
+copy: "+yw
+paste: "+p (doesnt seem to work on windows)
+
+== page navigation
+Ctrl + d = half page
+ctrl + f = full page
+ctrl + b = back page
+
+
+== bookmark
+md = bookmark position to letter d
+'d = restore position
+
+== goto line
+:30 = goto line 30
+19G = goto line 19
+
+
+=== tricks
+10o (puts in edit mode, whatever you write will repeat 10 times)
+10i (puts in edit mode, whatever you write will repeat 10 times)
+
+
+== Using * and # for Quick Searches
+* is for finding exact, whole-word matches.
+g* is for finding partial, substring matches.
+
+
+=== JUMP
+'' last position
+ctrl + o = next
+ctrl + i = prior
+
+== INCREMENT & DECREMENT
+Ctrl + a
+ctrl + x
+
+== PASTE REGISTER
+in EDIT MODE = Ctrl + r
+
+== PASTE REGISTER
+in NORMAL MODE = 
+"%p
+
+
+== NORM
+:norm 
+then you execute any command per line
+
+
+== substitute
+:s (current line)
+:%s (whole file)
+:<..>s (range)
+
+
+== ! execution!
+!<...>sort | uniq
+
+
+
+==================================
+Ctrl-h	Backspace (delete left)
+Ctrl-w	Delete one word backwards
+Ctrl-u	Delete from cursor to start of line
+Ctrl-o	Do one Normal-mode command, then return to Insert
