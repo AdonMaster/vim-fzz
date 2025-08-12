@@ -25,10 +25,10 @@ function! Fzz()
     if type(s:server) != v:t_job
 
         let l:dir = fnamemodify(resolve(expand('<sfile>:p')), ':h')
-        let l:path = l:dir . '/fzz.exe'
+        let l:path = l:dir . '/bin/fzz.exe'
 
         " Job start
-        let s:server = job_start([l:path], {
+        let s:server = job_start([l:path, getcwd()], {
                     \ 'out_cb': funcref('s:ServerCb'), 
                     \ 'in_io': 'pipe', 
                     \ 'out_io': 'pipe', 
@@ -44,10 +44,7 @@ function! Fzz()
 
 
     "// Initialization
-    let s:data = [
-        \ 'this is something',
-        \ 'something green tea!!',
-    \ ]
+    let s:data = []
     let s:q = ''
        
 
@@ -57,11 +54,14 @@ function! Fzz()
         \ 'pos': 'center',
         \ 'border': [],
         \ 'padding': [],
-        \ 'minwidth': 30, 
+        \ 'minwidth': 130, 
         \ 'mapping': 0,
         \ 'filter': funcref('s:Filter'),
         \ 'highlight': 'Normal',
     \ })
+
+    "//
+    call s:ServerSend()
 
 endfunction
 
@@ -69,7 +69,12 @@ endfunction
 
 " //
 function! s:ServerCb(channel, message)
-    let s:data = [a:message]
+
+    let s:data += [a:message]
+    if stridx(a:message, '=======>') == 0
+        let s:data = []
+    endif
+
     call s:Refresh()
 endfunction
 
