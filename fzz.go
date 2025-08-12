@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
+	"time"
 )
 
 // errs
@@ -18,6 +20,7 @@ var ErrAbort = errors.New("Abort")
 
 // structs
 type SearchRequest struct {
+	Id int32
     Query string
     Done chan bool
 }
@@ -27,6 +30,7 @@ const MAX_RESULTS = 25
 
 // global
 var root string
+var requestId atomic.Int32
 
 //
 func main() {
@@ -41,10 +45,12 @@ func main() {
     reqCh := make(chan SearchRequest)
     go dispatcher(reqCh)
 
+	//
     scanner := bufio.NewScanner(os.Stdin)
     for scanner.Scan() {
         query := scanner.Text()
-        reqCh <- SearchRequest{Query: query, Done: make(chan bool)}
+		requestId.Add(1)
+		reqCh <- SearchRequest{Id: requestId.Load(), Query: query, Done: make(chan bool)}
     }
 }
 
@@ -73,7 +79,9 @@ func searchWorker(req SearchRequest) {
 	var err error
 
     // header
-	fmt.Println("=======>")
+	if !sendBuffer(req.Id, "<bof>") {
+		return
+	}
 
     // empty query prints shallow list
     if req.Query == "" {
@@ -87,33 +95,47 @@ func searchWorker(req SearchRequest) {
             if entry.IsDir() {
                 fullPath = fullPath + "/"
             }
-            fmt.Println(fullPath)
+
+			// 
+			if !sendBuffer(req.Id, fullPath) {
+				return
+			}
         }
+
+		// 
+		if !sendBuffer(req.Id, "<eof>") {
+			return
+		}
+
         return
     }
 
     // query not empty, lets roll!!
+
+
 	// build pattern
 	var patternBuilder strings.Builder
-	patternBuilder.WriteString(".*")
+	patternBuilder.WriteString("(?i).*?")
 
 	// words from query
-	words := strings.Fields(strings.ReplaceAll(req.Query, ".", ""))
+	words := strings.Fields(req.Query)
 	if len(words) > 0 {
 		for i, word := range words {
 			escapedWord := regexp.QuoteMeta(word)
-			patternBuilder.WriteString(".*")
+			//patternBuilder.WriteString(".*")
 			for _, char := range escapedWord {
 				patternBuilder.WriteRune(char)
-				//patternBuilder.WriteString(".*")
+				patternBuilder.WriteString(".*?")
 			}
-			patternBuilder.WriteString(".*")
+			//patternBuilder.WriteString(".*")
 			if i < len(words)-1 {
-				patternBuilder.WriteString("/")
+				patternBuilder.WriteString(".*?")
 			}
 		}
 	}
+	patternBuilder.WriteString(".*$")
 	pattern := patternBuilder.String()
+	sendBuffer(req.Id, fmt.Sprintf("<debug v='%s'>", pattern))
 
 	// compile pattern
 	reg, err := regexp.Compile(pattern)
@@ -139,7 +161,9 @@ func searchWorker(req SearchRequest) {
 		// printing
 		if reg.MatchString(strings.ToLower(name)) {
 
-			fmt.Println(name)
+			if !sendBuffer(req.Id, name) {
+				return nil
+			}
 
             // result count and limit
             resultCount++
@@ -155,20 +179,38 @@ func searchWorker(req SearchRequest) {
 
 
 	//
-	if err != nil {
-
-        //
-        if errors.Is(err, ErrAbort) {
-            return
-        }
-
-        //
+	if err != nil && !errors.Is(err, ErrAbort) {
 		fmt.Printf("%q: %v", "./", err)
+		return
+	}
+
+	// end!? Only checking this condition in case of additional code
+	if !sendBuffer(req.Id, "<eof>") {
 		return
 	}
 
 }
 
+
+// send buffer out
+func sendBuffer(rid int32, path string) bool {
+
+	// is request the current
+	if requestId.Load() != rid { return false }
+	//
+	normalizedRoot := strings.ReplaceAll(root, "\\", "/")
+	relativePath := strings.ReplaceAll(path, normalizedRoot, "")
+	relativePath = strings.TrimPrefix(relativePath, "/")
+
+	// sleep
+	time.Sleep(100 * time.Millisecond)
+
+	//
+	fmt.Println(relativePath)
+
+	//
+	return true
+}
 
 func breadthFirstWalk(dir string, cb func(path string, entry os.DirEntry) error) error {
 

@@ -12,6 +12,7 @@ endfunction
 
 
 " //
+let s:is_win = has('win32') || has('win64')
 let s:instance = -1
 let s:q = ''
 let s:data = []
@@ -25,7 +26,7 @@ function! Fzz()
     if type(s:server) != v:t_job
 
         let l:dir = fnamemodify(resolve(expand('<sfile>:p')), ':h')
-        let l:path = l:dir . '/bin/fzz.exe'
+        let l:path = l:dir . '/bin/fzz' . (s:is_win ? '.exe' : '')
 
         " Job start
         let s:server = job_start([l:path, getcwd()], {
@@ -54,7 +55,7 @@ function! Fzz()
         \ 'pos': 'center',
         \ 'border': [],
         \ 'padding': [],
-        \ 'minwidth': 130, 
+        \ 'minwidth': 40, 
         \ 'mapping': 0,
         \ 'filter': funcref('s:Filter'),
         \ 'highlight': 'Normal',
@@ -71,8 +72,10 @@ endfunction
 function! s:ServerCb(channel, message)
 
     let s:data += [a:message]
-    if stridx(a:message, '=======>') == 0
+    if a:message == '<bof>'
         let s:data = []
+    elseif a:message == '<eof>'
+        " do nothing for now
     endif
 
     call s:Refresh()
