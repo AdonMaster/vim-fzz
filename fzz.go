@@ -98,7 +98,7 @@ func searchWorker(req SearchRequest) {
 	patternBuilder.WriteString(".*")
 
 	// words from query
-	words := strings.Fields(req.Query)
+	words := strings.Fields(strings.ReplaceAll(req.Query, ".", ""))
 	if len(words) > 0 {
 		for i, word := range words {
 			escapedWord := regexp.QuoteMeta(word)
