@@ -17,6 +17,8 @@ let s:instance = -1
 let s:q = ''
 let s:data = []
 let s:server = -1
+let s:debounce_refresh = -1
+let s:debounce_refresh_delay = 22
 
 
 " // 
@@ -71,14 +73,22 @@ endfunction
 " //
 function! s:ServerCb(channel, message)
 
-    let s:data += [a:message]
     if a:message == '<bof>'
         let s:data = []
     elseif a:message == '<eof>'
         " do nothing for now
+    elseif match(a:message, '^<debug ') == 0
+        " do nothing as well
+    else 
+        let s:data += [a:message]
     endif
 
-    call s:Refresh()
+    " little debounce logic in here
+    if s:debounce_refresh != -1
+        call timer_stop(s:debounce_refresh)
+    endif
+    let s:debounce_refresh = timer_start(s:debounce_refresh_delay, {-> s:Refresh()})
+
 endfunction
 
 

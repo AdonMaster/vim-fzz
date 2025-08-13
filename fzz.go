@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,16 +11,19 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 // errs
 var ErrAbort = errors.New("Abort")
+var ErrMaxResults = errors.New("MaxResults")
 
 
 // consts
 const MAX_RESULTS = 25
-const DEBOUNCE_INTERVAL = 900 * time.Millisecond
+const DEBOUNCE_INTERVAL = 750 * time.Millisecond
+const SIMULATE_SLOW = 10 * time.Millisecond
 
 // global
 var root string
@@ -33,9 +37,13 @@ func main() {
         root = os.Args[1]
     }
 
+	//
+	var wg sync.WaitGroup
+
     //
     reqCh := make(chan string)
-    go dispatcher(reqCh)
+    go dispatcher(reqCh, &wg)
+
 
 	//
     scanner := bufio.NewScanner(os.Stdin)
@@ -43,13 +51,19 @@ func main() {
         query := scanner.Text()
 		reqCh <-query 
     }
+
+	//
+	wg.Wait()
 }
 
 
 // *************
 
-func dispatcher(reqCh chan string) {
+func dispatcher(reqCh chan string, wg *sync.WaitGroup) {
     
+    //
+    var cancel context.CancelFunc
+
     //
     timer := time.NewTimer(DEBOUNCE_INTERVAL)
     timer.Stop()
@@ -78,15 +92,29 @@ func dispatcher(reqCh chan string) {
 
         // on timer triggers
         case <-timer.C:
+
+			//
+			if cancel != nil { cancel() }
             if lastRequest == nil { return }
-            go searchWorker(*lastRequest) // <-- function call
+
+			//
+			ctx, newCancel := context.WithCancel(context.Background())
+			cancel = newCancel
+
+			//
+            go searchWorker(ctx, *lastRequest, wg) // <-- function call
             lastRequest = nil
         }
     }
 }
 
-func searchWorker(req string) {
+func searchWorker(ctx context.Context, req string, wg *sync.WaitGroup) {
 
+	// main thread locking
+	wg.Add(1)
+	defer wg.Done()
+	
+	//
 	var err error
 
     // header
@@ -153,29 +181,39 @@ func searchWorker(req string) {
 	resultCount := 0
     err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 
-        // err
-        if err != nil {
-            return err
-        }
+		select {
+			
+		// context cancelled?
+		case <-ctx.Done():
+			return ErrAbort
+			
+		// let's move on
+		default:
 
-		// adjusting for folder to end with '/'
-		name := strings.ReplaceAll(path, "\\", "/")
-		if d.Type().IsDir() {
-			name = name + "/"
-		}
+			// err
+			if err != nil {
+				return err
+			}
 
-		// printing
-		if reg.MatchString(strings.ToLower(name)) {
+			// adjusting for folder to end with '/'
+			name := strings.ReplaceAll(path, "\\", "/")
+			if d.Type().IsDir() {
+				name = name + "/"
+			}
 
-			//
-			sendBuffer(name)
+			// printing
+			if reg.MatchString(strings.ToLower(name)) {
 
-            // result count and limit
-            resultCount++
-            if resultCount >= MAX_RESULTS {
-                return ErrAbort
-            }
-            
+				//
+				sendBuffer(name)
+
+				// result count and limit
+				resultCount++
+				if resultCount >= MAX_RESULTS {
+					return ErrMaxResults
+				}
+				
+			}
 		}
 
 		//
@@ -184,12 +222,18 @@ func searchWorker(req string) {
 
 
 	//
-	if err != nil && !errors.Is(err, ErrAbort) {
-		fmt.Printf("%q: %v", "./", err)
-		return
+	if err != nil {
+		if errors.Is(err, ErrAbort) {
+			sendBuffer(fmt.Sprintf("<debug v='%v'>", err))
+			return
+		}
+		if !errors.Is(err, ErrMaxResults) {
+			sendBuffer(fmt.Sprintf("<error v='%v'>", err))
+			return
+		}
 	}
 
-	// end!? Only checking this condition in case of additional code
+	// 
 	sendBuffer("<eof>")
 
 }
@@ -204,7 +248,7 @@ func sendBuffer(path string) bool {
 	relativePath = strings.TrimPrefix(relativePath, "/")
 
 	// sleep
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(SIMULATE_SLOW)
 
 	//
 	fmt.Println(relativePath)
