@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -18,19 +17,12 @@ import (
 var ErrAbort = errors.New("Abort")
 
 
-// structs
-type SearchRequest struct {
-	Id int32
-    Query string
-}
-
 // consts
 const MAX_RESULTS = 25
-const DEBOUNCE_INTERVAL = 900
+const DEBOUNCE_INTERVAL = 900 * time.Millisecond
 
 // global
 var root string
-var requestId atomic.Int32
 
 //
 func main() {
@@ -42,29 +34,28 @@ func main() {
     }
 
     //
-    reqCh := make(chan SearchRequest)
+    reqCh := make(chan string)
     go dispatcher(reqCh)
 
 	//
     scanner := bufio.NewScanner(os.Stdin)
     for scanner.Scan() {
         query := scanner.Text()
-		requestId.Add(1)
-		reqCh <- SearchRequest{Id: requestId.Load(), Query: query}
+		reqCh <-query 
     }
 }
 
 
 // *************
 
-func dispatcher(reqCh chan SearchRequest) {
+func dispatcher(reqCh chan string) {
     
     //
     timer := time.NewTimer(DEBOUNCE_INTERVAL)
     timer.Stop()
 
     // holds the last request
-    var lastRequest *SearchRequest
+	var lastRequest *string 
     for {
         select {
 
@@ -72,7 +63,6 @@ func dispatcher(reqCh chan SearchRequest) {
         case req, ok := <-reqCh:
             if !ok { return }
 
-            // 
             lastRequest = &req
 
             // clears the channel
@@ -95,17 +85,15 @@ func dispatcher(reqCh chan SearchRequest) {
     }
 }
 
-func searchWorker(req SearchRequest) {
+func searchWorker(req string) {
 
 	var err error
 
     // header
-	if !sendBuffer(req.Id, "<bof>") {
-		return
-	}
+	sendBuffer("<bof>")
 
     // explode qry
-	words := strings.Fields(req.Query)
+	words := strings.Fields(req)
 
     // empty query prints shallow list
     if len(words) <= 0 {
@@ -122,16 +110,13 @@ func searchWorker(req SearchRequest) {
             }
 
 			// 
-			if !sendBuffer(req.Id, fullPath) {
-				return
-			}
+			sendBuffer(fullPath)
         }
 
 		// 
-		if !sendBuffer(req.Id, "<eof>") {
-			return
-		}
+		sendBuffer("<eof>")
 
+		//
         return
     }
 
@@ -156,7 +141,7 @@ func searchWorker(req SearchRequest) {
     }
     patternBuilder.WriteString(".*")
 	pattern := patternBuilder.String()
-	sendBuffer(req.Id, fmt.Sprintf("<debug v='%s'>", pattern))
+	sendBuffer(fmt.Sprintf("<debug v='%s'>", pattern))
 
 	// compile pattern
 	reg, err := regexp.Compile(pattern)
@@ -182,9 +167,8 @@ func searchWorker(req SearchRequest) {
 		// printing
 		if reg.MatchString(strings.ToLower(name)) {
 
-			if !sendBuffer(req.Id, name) {
-				return nil
-			}
+			//
+			sendBuffer(name)
 
             // result count and limit
             resultCount++
@@ -206,18 +190,14 @@ func searchWorker(req SearchRequest) {
 	}
 
 	// end!? Only checking this condition in case of additional code
-	if !sendBuffer(req.Id, "<eof>") {
-		return
-	}
+	sendBuffer("<eof>")
 
 }
 
 
 // send buffer out
-func sendBuffer(rid int32, path string) bool {
+func sendBuffer(path string) bool {
 
-	// is request the current
-	if requestId.Load() != rid { return false }
 	//
 	normalizedRoot := strings.ReplaceAll(root, "\\", "/")
 	relativePath := strings.ReplaceAll(path, normalizedRoot, "")
