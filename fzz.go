@@ -22,11 +22,11 @@ var ErrAbort = errors.New("Abort")
 type SearchRequest struct {
 	Id int32
     Query string
-    Done chan bool
 }
 
 // consts
 const MAX_RESULTS = 25
+const DEBOUNCE_INTERVAL = 900
 
 // global
 var root string
@@ -50,7 +50,7 @@ func main() {
     for scanner.Scan() {
         query := scanner.Text()
 		requestId.Add(1)
-		reqCh <- SearchRequest{Id: requestId.Load(), Query: query, Done: make(chan bool)}
+		reqCh <- SearchRequest{Id: requestId.Load(), Query: query}
     }
 }
 
@@ -59,19 +59,40 @@ func main() {
 
 func dispatcher(reqCh chan SearchRequest) {
     
-    var current SearchRequest
-    for req := range reqCh {
+    //
+    timer := time.NewTimer(DEBOUNCE_INTERVAL)
+    timer.Stop()
 
-        // cancel previous
-        if current.Done != nil {
-            close(current.Done)
+    // holds the last request
+    var lastRequest *SearchRequest
+    for {
+        select {
+
+        // on reqCh triggers
+        case req, ok := <-reqCh:
+            if !ok { return }
+
+            // 
+            lastRequest = &req
+
+            // clears the channel
+            if !timer.Stop() {
+                select {
+                case <- timer.C:
+                default:
+                }
+            }
+			// restart timer
+            timer.Reset(DEBOUNCE_INTERVAL)
+
+
+        // on timer triggers
+        case <-timer.C:
+            if lastRequest == nil { return }
+            go searchWorker(*lastRequest) // <-- function call
+            lastRequest = nil
         }
-
-        current = req
-        go searchWorker(req)
-
     }
-
 }
 
 func searchWorker(req SearchRequest) {
@@ -83,8 +104,12 @@ func searchWorker(req SearchRequest) {
 		return
 	}
 
+    // explode qry
+	words := strings.Fields(req.Query)
+
     // empty query prints shallow list
-    if req.Query == "" {
+    if len(words) <= 0 {
+
         shallowList, err := os.ReadDir(root)
         if err != nil {
             log.Fatalf("failed to retrieve shallow list: %v", err)
@@ -111,29 +136,25 @@ func searchWorker(req SearchRequest) {
     }
 
     // query not empty, lets roll!!
-
-
 	// build pattern
 	var patternBuilder strings.Builder
-	patternBuilder.WriteString("(?i).*?")
+	patternBuilder.WriteString("(?i).*")
 
 	// words from query
-	words := strings.Fields(req.Query)
-	if len(words) > 0 {
-		for i, word := range words {
-			escapedWord := regexp.QuoteMeta(word)
-			//patternBuilder.WriteString(".*")
-			for _, char := range escapedWord {
-				patternBuilder.WriteRune(char)
-				patternBuilder.WriteString(".*?")
-			}
-			//patternBuilder.WriteString(".*")
-			if i < len(words)-1 {
-				patternBuilder.WriteString(".*?")
-			}
-		}
-	}
-	patternBuilder.WriteString(".*$")
+    for i, word := range words {
+        for _, char := range word {
+            charString := string(char)
+            escapedChar := regexp.QuoteMeta(charString)
+            patternBuilder.WriteString(escapedChar)
+            if charString != "/" {
+                patternBuilder.WriteString("[^/]*")
+            }
+        }
+        if i < len(words)-1 {
+            patternBuilder.WriteString("\\/.*")
+        }
+    }
+    patternBuilder.WriteString(".*")
 	pattern := patternBuilder.String()
 	sendBuffer(req.Id, fmt.Sprintf("<debug v='%s'>", pattern))
 
@@ -210,61 +231,4 @@ func sendBuffer(rid int32, path string) bool {
 
 	//
 	return true
-}
-
-func breadthFirstWalk(dir string, cb func(path string, entry os.DirEntry) error) error {
-
-	queue := []string{dir}
-
-	for len(queue) > 0 {
-
-		//
-		currentDir := queue[0]
-		queue = queue[1:]
-
-		//
-		entries, err := os.ReadDir(currentDir)
-		if err != nil {
-			return err
-		}
-
-		//
-		var subdirs []string
-		for _, entry := range entries {
-            
-			fullPath := filepath.Join(currentDir, entry.Name())
-            fullPath = strings.ReplaceAll(fullPath, "\\", "/")
-
-            // call
-			err = cb(fullPath, entry)
-            if err != nil {
-                // abort error
-                if errors.Is(err, ErrAbort) {
-                    return nil
-                }
-                return err
-            }
-
-			if entry.IsDir() {
-				subdirs = append(subdirs, fullPath)
-			}
-		}
-
-		//
-		queue = append(queue, subdirs...)
-	}
-
-	//
-	return nil
-}
-
-
-// =====
-func strContains(s []string, str string) bool {
-    for _, v := range s {
-        if v == str {
-            return true
-        }
-    }
-    return false
 }
