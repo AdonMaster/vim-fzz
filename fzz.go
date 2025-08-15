@@ -1,5 +1,9 @@
 package main
 
+
+//TODO: the search gets blocked with some levels
+//TODO: the search considers absolute path, should be relative path
+
 import (
 	"bufio"
 	"context"

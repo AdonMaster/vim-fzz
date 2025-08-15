@@ -22,7 +22,7 @@ let s:debounce_refresh = -1
 let s:debounce_refresh_delay = 22
 let s:loading = ''
 let s:selected = 0
-
+let s:request_count = 0
 
 
 " // 
@@ -47,6 +47,9 @@ function! Fzz()
             echo 'Error: Failed to start fzz'
             return
         endif
+
+        " debug
+        let s:request_count = 0
     endif
 
 
@@ -77,6 +80,11 @@ endfunction
 " //
 function! s:ServerCb(channel, message)
 
+    " //
+    let s:request_count += 1
+    echo 'request_count: ' . s:request_count
+
+    " //
     if a:message == '<bof>'
         let s:selected = ResetData()
         let s:loading = ' Loading... '
