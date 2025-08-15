@@ -4,6 +4,7 @@
 
 " Global
 command! -nargs=0 Fzz call Fzz()
+nnoremap <C-p> :Fzz<CR>
 "
 function! FzzClose()
     call s:Close()
@@ -50,7 +51,7 @@ function! Fzz()
 
 
     "// Initialization
-    let s:data = []
+    call ResetData()
     let s:q = ''
        
 
@@ -77,16 +78,14 @@ endfunction
 function! s:ServerCb(channel, message)
 
     if a:message == '<bof>'
-        let s:data = []
+        let s:selected = ResetData()
         let s:loading = ' Loading... '
-        let s:selected = -1
     elseif a:message == '<eof>'
         let s:loading = ''
     elseif match(a:message, '^<debug ') == 0
         " do nothing as well
     else 
         let s:data += [a:message]
-        let s:selected = 0
     endif
 
     " loading title
@@ -106,12 +105,12 @@ endfunction
 "
 function! s:Filter(instance_id, key)
     
-    " Escape
-    if a:key == "\<Esc>"
+    " Escape or <C-p>
+    if a:key == "\<Esc>" || a:key == "\<C-p>"
         call popup_close(a:instance_id)
         return 1
-    endif
 
+    endif
     " Enter
     if a:key == "\<Enter>"
         call s:OpenFile()
@@ -192,8 +191,16 @@ function! s:Refresh()
     " //
     let l:display_data = []
     for i in range(l:n)
-        let l:select_prefix = i == s:selected ? "-> " : "   " 
-        let l:display_data += [l:select_prefix . s:data[i]]
+        let l:s = s:data[i]
+        let l:is_dir = l:s =~ '/$'
+
+        let l:prefix = l:is_dir ? '[] ' : "   "
+        if i == s:selected
+            let l:symbol = l:is_dir ? '[>' : '->'
+            let l:prefix = l:symbol . " "
+        endif
+
+        let l:display_data += [l:prefix . l:s]
     endfor
 
     " refresh
@@ -230,7 +237,7 @@ function! s:OpenFile()
     " is path directory? append to s:q
     if isdirectory(l:path)
 
-        let s:q = l:path "TODO: fix this shittt!!
+        let s:q = l:uri
 
         "
         call s:Refresh()
@@ -240,14 +247,48 @@ function! s:OpenFile()
     endif
 
 
-    " check if full path is a valid file, NOT DIRECTORY 
-    if !filereadable(l:path)
+    " extract the correct string for target file
+    let l:target_file = ''
+    if filereadable(l:uri)
+        let l:target_file = l:uri
+    elseif filereadable(l:path)
+        let l:target_file = l:path
+    else
         echohl ErrorMsg | echom l:path . ' - not a valid file' | echohl None
         return
     endif
 
+    " ------------------------------------
     " close popup and open file
     call s:Close()
-    execute 'edit' l:path
 
+    " open a new buffer, or select an existing one
+    let l:bufnum = bufnr(l:target_file)
+    if l:bufnum > 0
+        execute 'buffer' l:bufnum
+    else
+        execute 'edit' l:path
+    endif
+
+endfunction
+
+" //
+function! GetBufferList()
+    let l:paths = []
+    for b in getbufinfo({'buflisted': 1})
+        if !empty(b.name)
+            call add(l:paths, b.name)
+        endif
+    endfor
+    return l:paths
+endfunction
+
+
+" //
+function! ResetData()
+    let s:data = GetBufferList()
+    if len(s:data) > 0 
+        let s:data += ['-------------------------']
+    endif
+    return len(s:data)
 endfunction

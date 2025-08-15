@@ -22,8 +22,8 @@ var ErrMaxResults = errors.New("MaxResults")
 
 // consts
 const MAX_RESULTS = 25
-const DEBOUNCE_INTERVAL = 750 * time.Millisecond
-const SIMULATE_SLOW = 10 * time.Millisecond
+const DEBOUNCE_INTERVAL = 400 * time.Millisecond
+const SIMULATE_SLOW = 0 * time.Millisecond
 
 // global
 var root string
@@ -179,7 +179,7 @@ func searchWorker(ctx context.Context, req string, wg *sync.WaitGroup) {
 
     // walk dir
 	resultCount := 0
-    err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+    err = breadthFirstWalk(root, func(path string, d fs.DirEntry) error {
 
 		select {
 			
@@ -189,11 +189,6 @@ func searchWorker(ctx context.Context, req string, wg *sync.WaitGroup) {
 			
 		// let's move on
 		default:
-
-			// err
-			if err != nil {
-				return err
-			}
 
 			// adjusting for folder to end with '/'
 			name := strings.ReplaceAll(path, "\\", "/")
@@ -255,4 +250,53 @@ func sendBuffer(path string) bool {
 
 	//
 	return true
+}
+
+
+
+// breadth walk
+func breadthFirstWalk(dir string, cb func(path string, entry os.DirEntry) error) error {
+
+    queue := []string{dir}
+
+    for len(queue) > 0 {
+
+        //
+        currentDir := queue[0]
+        queue = queue[1:]
+
+        //
+        entries, err := os.ReadDir(currentDir)
+        if err != nil {
+            return err
+        }
+
+        //
+        var subdirs []string
+        for _, entry := range entries {
+
+            fullPath := filepath.Join(currentDir, entry.Name())
+            fullPath = strings.ReplaceAll(fullPath, "\\", "/")
+
+            // call
+            err = cb(fullPath, entry)
+            if err != nil {
+                // abort error
+                if errors.Is(err, ErrAbort) {
+                    return nil
+                }
+                return err
+            }
+
+            if entry.IsDir() {
+                subdirs = append(subdirs, fullPath)
+            }
+        }
+
+        //
+        queue = append(queue, subdirs...)
+    }
+
+    //
+    return nil
 }
