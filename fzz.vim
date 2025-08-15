@@ -19,6 +19,9 @@ let s:data = []
 let s:server = -1
 let s:debounce_refresh = -1
 let s:debounce_refresh_delay = 22
+let s:loading = ''
+let s:selected = 0
+
 
 
 " // 
@@ -75,13 +78,20 @@ function! s:ServerCb(channel, message)
 
     if a:message == '<bof>'
         let s:data = []
+        let s:loading = ' Loading... '
+        let s:selected = -1
     elseif a:message == '<eof>'
-        " do nothing for now
+        let s:loading = ''
     elseif match(a:message, '^<debug ') == 0
         " do nothing as well
     else 
         let s:data += [a:message]
+        let s:selected = 0
     endif
+
+    " loading title
+    call popup_setoptions(s:instance, {'title': s:loading})
+
 
     " little debounce logic in here
     if s:debounce_refresh != -1
@@ -102,6 +112,16 @@ function! s:Filter(instance_id, key)
         return 1
     endif
 
+    " Enter
+    if a:key == "\<Enter>"
+        call s:OpenFile()
+        return 1
+    endif
+
+    " flags
+    let l:should_refresh = v:true
+    let l:should_send = v:true
+
     " Backspace
     if a:key == "\<BS>" 
         if len(s:q) > 0
@@ -111,6 +131,18 @@ function! s:Filter(instance_id, key)
     " Ctrl + Backspace
     elseif a:key == "\<C-BS>" || a:key == "\<C-h>" "
         let s:q = substitute(s:q, '\s*\S\+$', '', '')
+
+    " ctrl + j
+    elseif a:key == "\<C-j>"
+        let s:selected += 1
+        let s:selected = s:selected % len(s:data)
+        let l:should_send = v:false
+
+    " ctrl + k
+    elseif a:key == "\<C-k>"
+        let s:selected -= 1
+        let s:selected = (s:selected + len(s:data)) % len(s:data)
+        let l:should_send = v:false
 
     " Valid characters
     elseif len(a:key) == 1 && char2nr(a:key) >= 32 && char2nr(a:key) <= 126 
@@ -123,10 +155,14 @@ function! s:Filter(instance_id, key)
 
 
     " //
-    call s:Refresh()
+    if l:should_refresh
+        call s:Refresh()
+    endif
 
     " // Server request
-    call s:ServerSend()
+    if l:should_send
+        call s:ServerSend()
+    endif
 
     "
     return 1
@@ -145,12 +181,23 @@ endfunction
 " //
 function! s:Refresh()
 
+    "
+    let l:n = len(s:data)
+
+
     " Title
-    let l:title = (len(s:q) > 0) ? ' "' . s:q . '" ' : ' Fzz - Adon '
+    let l:title = (s:q != '') ? (' "' . s:q . '" ') : ' Fzz - Adon '
     call popup_setoptions(s:instance, {'title': l:title})
 
-    " Set data and forces refresh
-    call popup_settext(s:instance, s:data)
+    " //
+    let l:display_data = []
+    for i in range(l:n)
+        let l:select_prefix = i == s:selected ? "-> " : "   " 
+        let l:display_data += [l:select_prefix . s:data[i]]
+    endfor
+
+    " refresh
+    call popup_settext(s:instance, l:display_data)
 
 endfunction
 
@@ -165,4 +212,42 @@ function! s:Close()
         call job_stop(s:server)
         let s:server = -1
     endif
+endfunction
+
+
+" //
+function! s:OpenFile()
+
+    " selected data to form a valid uri
+    let l:uri = get(s:data, s:selected, '')
+    if l:uri == ''
+        return
+    endif
+
+    " full path
+    let l:path = getcwd() . '/' . l:uri
+    
+    " is path directory? append to s:q
+    if isdirectory(l:path)
+
+        let s:q = l:path "TODO: fix this shittt!!
+
+        "
+        call s:Refresh()
+        call s:ServerSend()
+        
+        return
+    endif
+
+
+    " check if full path is a valid file, NOT DIRECTORY 
+    if !filereadable(l:path)
+        echohl ErrorMsg | echom l:path . ' - not a valid file' | echohl None
+        return
+    endif
+
+    " close popup and open file
+    call s:Close()
+    execute 'edit' l:path
+
 endfunction
